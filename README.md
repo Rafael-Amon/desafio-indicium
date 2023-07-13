@@ -1,4 +1,5 @@
-Para executar o app 'Carros.py', instalar todos os pacotes listados no requirements.txt com o comando 'pip install requirements'
+Para executar o app 'Carros.py', instalar todos os pacotes listados no requirements.txt com o comando
+ 'pip install -r requirements.txt'
 
 Abrir o Terminal de comando.
 
