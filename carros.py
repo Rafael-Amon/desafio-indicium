@@ -6,6 +6,12 @@ from sklearn.preprocessing import StandardScaler
 
 carros = pd.read_parquet('./data/carros.parquet')
 
+# Carregar o objeto do OneHotEncoder
+encoder = joblib.load('./encoder.pkl')
+
+# Carregar o objeto do Scaler
+scaler = joblib.load('./scaler.pkl')
+
 # Mapear Colunas com respostas únicas para 1
 carros['dono_aceita_troca'] = carros['dono_aceita_troca'].map({'Aceita troca': 1})
 carros['veiculo_único_dono'] = carros['veiculo_único_dono'].map({'Único dono': 1})
@@ -53,31 +59,30 @@ def predicao_carros(caracteristicas):
     df_caracteristicas = pd.DataFrame(columns=ordem_colunas)
     df_caracteristicas.loc[0] = caracteristicas
 
-    colunas_categoricas = [coluna for coluna in colunas_categoricas if coluna in df_caracteristicas.columns]
+    colunas_categoricas = ['marca', 'cambio', 'tipo', 'blindado', 'cor', 'tipo_vendedor', 'estado_vendedor', 'anunciante']
+    colunas_numericas = ['ano_de_fabricacao', 'ano_modelo', 'hodometro', 'num_portas', 'dono_aceita_troca',
+                         'veiculo_único_dono', 'revisoes_concessionaria', 'ipva_pago', 'veiculo_licenciado', 'garantia_de_fábrica', 'revisoes_dentro_agenda']
 
-    ohe = OneHotEncoder(sparse=False, drop='first')
+    # Aplicar One Hot Encoder nas colunas categóricas
+    encoded_features = encoder.transform(df_caracteristicas[colunas_categoricas])
 
-    for coluna_categorica in colunas_categoricas:
-        ohe.fit(carros[[coluna_categorica]])
-        colunas_ohe_teste = ohe.transform(df_caracteristicas[[coluna_categorica]])
+    # Obter os nomes das novas colunas após a codificação
+    encoded_columns = encoder.get_feature_names_out(colunas_categoricas)
 
-        categorias_ohe = ohe.categories_[0][1:]
+    # Criar um DataFrame com as colunas codificadas
+    df_encoded = pd.DataFrame(encoded_features, columns=encoded_columns)
 
-        for indice, nome_categoria in enumerate(categorias_ohe):
-            df_caracteristicas[nome_categoria] = colunas_ohe_teste[:, indice]
+     # Concatenar as colunas codificadas com as colunas numéricas
+    df_caracteristicas_encoded = pd.concat([df_caracteristicas[colunas_numericas], df_encoded], axis=1)
 
-        df_caracteristicas = df_caracteristicas.drop(coluna_categorica, axis=1)
+    # Aplicar o Scaling nas colunas numéricas
+    scaled_features = scaler.transform(df_caracteristicas_encoded)
 
-    colunas_numericas = [coluna for coluna in ordem_colunas if coluna not in colunas_categoricas]
-
-    scaler = StandardScaler()
-
-    for coluna_numerica in colunas_numericas:
-        scaler.fit(carros[[coluna_numerica]])
-        df_caracteristicas[coluna_numerica] = scaler.transform(df_caracteristicas[[coluna_numerica]])
+    # Criar um DataFrame com as colunas escaladas
+    df_scaled = pd.DataFrame(scaled_features, columns=df_caracteristicas_encoded.columns)
 
     modelo = joblib.load('./models/xgb_model.pkl')
-    preco = modelo.predict(df_caracteristicas)
+    preco = modelo.predict(df_scaled)
 
     return preco
 
